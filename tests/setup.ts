@@ -1,0 +1,21 @@
+// Set required environment variables before any module loads
+process.env.NODE_ENV = 'test';
+process.env.PORT = '3001';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+process.env.MIGRATION_DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+process.env.REDIS_URL = 'redis://localhost:6379';
+process.env.GMAIL_CLIENT_ID = 'test-client-id';
+process.env.GMAIL_CLIENT_SECRET = 'test-client-secret';
+process.env.GMAIL_REFRESH_TOKEN = 'test-refresh-token';
+process.env.WHATSAPP_PHONE_NUMBER_ID = '123456789';
+process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = '987654321';
+process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
+process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test-verify-token';
+process.env.WHATSAPP_APP_SECRET = 'test-app-secret';
+process.env.WHATSAPP_API_VERSION = 'v21.0';
+process.env.JWT_SECRET = 'test-jwt-secret-must-be-at-least-32-chars!!';
+process.env.JWT_EXPIRY = '1h';
+process.env.ADMIN_PASSWORD_HASH = '$2b$12$ApLtxKAdWnpE.IHpQM0Np.RT40VquQ4dM0QqMOth5T4Bl9f9IfNrS';
+process.env.ALLOWED_ORIGINS = 'http://localhost:3001';
+process.env.LOG_LEVEL = 'error'; // suppress logs during tests

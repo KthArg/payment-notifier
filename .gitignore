@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+*.js.map
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+error.log
+combined.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.editorconfig
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Testing
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+
+# Secrets & credentials
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+service-account.json
+credentials.json
+*-service-account.json
+google-credentials.json
+firebase-adminsdk*.json
+
+# Scripts de tokens / setup local
+get-mail-token.js
+get-mail-token.ts
+
+# Railway
+.railway/
