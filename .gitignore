@@ -78,3 +78,6 @@ get-mail-token.ts
 
 # Railway
 .railway/
+
+# Claude
+.claude/
