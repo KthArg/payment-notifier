@@ -21,6 +21,9 @@ import { transactionQueue } from './queues/transaction.queue';
 export function createApp(): Application {
   const app = express();
 
+  // Trust Railway's reverse proxy
+  app.set('trust proxy', 1);
+
   // Security middleware
   app.use(helmet());
 
