@@ -1,4 +1,4 @@
-import { Queue, QueueEvents } from 'bullmq';
+import { Queue } from 'bullmq';
 import { env } from '../config/environment';
 import { logger } from '../utils/logger';
 import { ParsedTransaction } from '../types/transaction.types';
@@ -72,33 +72,6 @@ export const transactionQueue = new Queue<TransactionJobData, TransactionJobResu
 );
 
 /**
- * Queue event listener for monitoring and logging
- */
-export const transactionQueueEvents = new QueueEvents(QUEUE_NAME, {
-  connection: getRedisConnection(),
-});
-
-transactionQueueEvents.on('completed', ({ jobId, returnvalue }) => {
-  const result = returnvalue as unknown as TransactionJobResult;
-  logger.info('Transaction job completed', {
-    jobId,
-    transactionId: result?.transactionId,
-    whatsappMessageId: result?.whatsappMessageId,
-  });
-});
-
-transactionQueueEvents.on('failed', ({ jobId, failedReason }) => {
-  logger.error('Transaction job failed permanently', {
-    jobId,
-    reason: failedReason,
-  });
-});
-
-transactionQueueEvents.on('stalled', ({ jobId }) => {
-  logger.warn('Transaction job stalled (worker may have crashed)', { jobId });
-});
-
-/**
  * Add a parsed transaction to the queue for processing.
  */
 export async function enqueueTransaction(
@@ -135,7 +108,6 @@ export async function getQueueStats() {
  * Gracefully close the queue connection
  */
 export async function closeQueue(): Promise<void> {
-  await transactionQueueEvents.close();
   await transactionQueue.close();
   logger.info('Transaction queue closed');
 }
