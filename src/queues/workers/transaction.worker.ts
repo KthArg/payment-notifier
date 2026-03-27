@@ -188,6 +188,7 @@ export function createTransactionWorker(): Worker<TransactionJobData, Transactio
     {
       connection: getRedisConnection(),
       concurrency: 3,
+      drainDelay: 30_000,       // wait 30s between polls when queue is empty (default: 5ms)
       stalledInterval: 300_000, // check stalled jobs every 5 min (default: 30s)
       limiter: {
         max: 10,
