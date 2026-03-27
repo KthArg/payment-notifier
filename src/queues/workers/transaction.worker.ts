@@ -4,6 +4,8 @@ import { logger } from '../../utils/logger';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
 import { UserRepository } from '../../database/repositories/user.repository';
 import { NotificationLogRepository } from '../../database/repositories/notification-log.repository';
+import { MemberRepository } from '../../database/repositories/member.repository';
+import { MonthlyRecordRepository } from '../../database/repositories/monthly-record.repository';
 import { WhatsAppService } from '../../services/whatsapp.service';
 import { QUEUE_NAME, TransactionJobData, TransactionJobResult, TransactionJobName } from '../transaction.queue';
 import { maskPhoneNumber } from '../../utils/phone-formatter';
@@ -19,6 +21,8 @@ const RETRY_DELAYS_MS = [0, 60_000, 300_000];
 const transactionRepo = new TransactionRepository();
 const userRepo = new UserRepository();
 const notificationLogRepo = new NotificationLogRepository();
+const memberRepo = new MemberRepository();
+const monthlyRecordRepo = new MonthlyRecordRepository();
 const whatsappService = new WhatsAppService();
 
 /** BullMQ connection options derived from REDIS_URL */
@@ -47,7 +51,12 @@ function getRedisConnection() {
 async function processTransaction(
   job: Job<TransactionJobData, TransactionJobResult, TransactionJobName>
 ): Promise<TransactionJobResult> {
-  const { parsedTransaction, notifyPhone } = job.data;
+  const { notifyPhone } = job.data;
+  // Dates are serialized to strings through Redis — restore them as Date objects
+  const parsedTransaction = {
+    ...job.data.parsedTransaction,
+    transactionDate: new Date(job.data.parsedTransaction.transactionDate),
+  };
   const { transactionId, bankName, amount, currency } = parsedTransaction;
 
   logger.info('Processing transaction job', {
@@ -80,22 +89,100 @@ async function processTransaction(
 
   logger.debug('Transaction persisted', { dbId: dbTransaction.id, transactionId });
 
-  // ── Step 3: Resolve recipient ────────────────────────────────────────────
-  const recipientPhone = notifyPhone ?? parsedTransaction.receiverPhone;
+  // ── Step 2.5: Auto-register sender + match to member ─────────────────────
+  if (parsedTransaction.senderPhone) {
+    const sender = await userRepo.upsertFromSinpe(
+      parsedTransaction.senderPhone,
+      parsedTransaction.senderName
+    ).catch(() => null);
+
+    if (sender) {
+      // Update last seen regardless of status
+      await userRepo.updateLastSeen(sender.id, dbTransaction.id);
+
+      // Check if sender is a registered member
+      const member = await memberRepo.findByPhone(parsedTransaction.senderPhone).catch(() => null);
+      if (member) {
+        // Link sender to member if not already
+        if (sender.status !== 'linked') {
+          await userRepo.linkToMember(sender.id, member.id);
+        }
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+        const record = await monthlyRecordRepo.findOrCreate(member.id, month, year, member.monthlyAmount).catch(() => null);
+        if (record && record.status === 'pending') {
+          const isPaidOnTime = now.getDate() <= member.dueDay;
+          await monthlyRecordRepo.markPaid(record.id, {
+            amountPaid: parsedTransaction.amount,
+            transactionId: dbTransaction.id,
+            status: isPaidOnTime ? 'paid_on_time' : 'paid_late',
+            paidAt: now,
+          }).catch(() => {});
+          logger.info('Member payment recorded', {
+            memberId: member.id,
+            memberName: member.fullName,
+            month, year,
+            status: isPaidOnTime ? 'paid_on_time' : 'paid_late',
+          });
+        }
+      } else if (sender.status === 'unknown') {
+        // Unknown sender — not a member, not dismissed — flag for admin review
+        logger.info('Unknown sender flagged for admin review', {
+          senderId: sender.id,
+          phone: maskPhoneNumber(parsedTransaction.senderPhone),
+          transactionId,
+        });
+      }
+    }
+  }
+
+  // ── Step 3: Resolve sender to notify ─────────────────────────────────────
+  // Notify the person who sent the SINPE (confirmation that payment was received)
+  const recipientPhone = notifyPhone ?? parsedTransaction.senderPhone;
 
   if (!recipientPhone) {
     await transactionRepo.updateStatus(dbTransaction.id, 'processed');
-    logger.warn('No recipient phone — transaction saved without WhatsApp notification', {
-      transactionId,
-    });
+
+    if (env.ACCOUNT_PHONE) {
+      const formattedAmount = `${currency === 'CRC' ? '₡' : '$'}${amount.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      await whatsappService.sendNotification({
+        phoneNumber: env.ACCOUNT_PHONE,
+        templateName: 'sinpe_sin_telefono',
+        templateData: {
+          senderName: parsedTransaction.senderName ?? 'Desconocido',
+          amount: formattedAmount,
+          bankName,
+        },
+      }).catch(err => logger.error('Failed to notify account owner', { error: err.message }));
+
+      logger.info('No sender phone — owner notified with dashboard link', {
+        transactionId,
+        dbId: dbTransaction.id,
+      });
+    } else {
+      logger.warn('No sender phone and ACCOUNT_PHONE not configured', { transactionId });
+    }
+
     return { success: true, transactionId };
   }
 
-  // Try to find user in DB for user_id linkage
+  // Try to find sender in DB (registered customers get personalized name)
   const user = await userRepo.findByPhone(recipientPhone).catch(() => null);
   if (user && !dbTransaction.userId) {
     await transactionRepo.linkToUser(dbTransaction.id, user.id).catch(() => {});
     dbTransaction = { ...dbTransaction, userId: user.id };
+  }
+
+  // Dismissed senders: log to DB but skip WhatsApp notification
+  if (user?.status === 'dismissed') {
+    await transactionRepo.updateStatus(dbTransaction.id, 'processed');
+    logger.info('Sender is dismissed — skipping WhatsApp notification', {
+      transactionId,
+      phone: maskPhoneNumber(recipientPhone),
+    });
+    return { success: true, transactionId };
   }
 
   // ── Step 4: Send WhatsApp notification ───────────────────────────────────
@@ -121,9 +208,9 @@ async function processTransaction(
       phoneNumber: recipientPhone,
       templateName: 'sinpe_recibido',
       templateData: {
-        recipientName: user?.fullName ?? 'Cliente',
+        recipientName: user?.fullName ?? parsedTransaction.senderName ?? 'Cliente',
         amount: `${currency === 'CRC' ? '₡' : '$'}${formattedAmount}`,
-        senderName: parsedTransaction.senderName ?? 'Desconocido',
+        senderName: parsedTransaction.senderName ?? 'Cliente',
         bankName,
         date: formattedDate,
         reference: transactionId,

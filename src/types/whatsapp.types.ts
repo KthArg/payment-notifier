@@ -5,7 +5,7 @@
 /**
  * WhatsApp message template names
  */
-export type TemplateName = 'sinpe_recibido' | 'sinpe_error';
+export type TemplateName = 'sinpe_recibido' | 'sinpe_error' | 'sinpe_sin_telefono' | 'payment_reminder';
 
 /**
  * Template parameter for WhatsApp messages
@@ -190,9 +190,35 @@ export interface SinpeErrorTemplateData {
 }
 
 /**
+ * Data for sinpe_sin_telefono template — sent to account owner when sender phone is missing.
+ * Template body (to be created in Meta):
+ *   "Recibiste un SINPE de *{{1}}* por *{{2}}* ({{3}}).
+ *    No se encontró el teléfono del remitente.
+ *    Regístralo aquí para notificarlo: {{4}}"
+ */
+export interface SinpeSinTelefonoTemplateData {
+  senderName: string; // {{1}}
+  amount: string;     // {{2}}
+  bankName: string;   // {{3}}
+}
+
+/**
+ * Data for payment_reminder template — sent to members before payment due date.
+ * Template body (create in Meta):
+ *   "Hola {{1}}, te recordamos que tu mensualidad de {{2}} en {{3}} vence el {{4}}.
+ *    Por favor realiza tu pago via SINPE Móvil para evitar inconvenientes. 🙏"
+ */
+export interface PaymentReminderTemplateData {
+  memberName: string;   // {{1}}
+  amount: string;       // {{2}} formatted
+  businessName: string; // {{3}}
+  dueDate: string;      // {{4}} e.g. "1 de abril"
+}
+
+/**
  * Template data union type
  */
-export type TemplateData = SinpeRecibidoTemplateData | SinpeErrorTemplateData;
+export type TemplateData = SinpeRecibidoTemplateData | SinpeErrorTemplateData | SinpeSinTelefonoTemplateData | PaymentReminderTemplateData;
 
 /**
  * Send notification options

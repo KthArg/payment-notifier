@@ -79,10 +79,66 @@ CREATE TABLE IF NOT EXISTS migration_history (
   applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Migration 005: Create members table
+CREATE TABLE IF NOT EXISTS members (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name       TEXT NOT NULL,
+  phone_number    TEXT NOT NULL,
+  phone_hash      TEXT NOT NULL UNIQUE,
+  email           TEXT,
+  monthly_amount  NUMERIC(15, 2) NOT NULL CHECK (monthly_amount > 0),
+  due_day         INTEGER NOT NULL DEFAULT 1 CHECK (due_day BETWEEN 1 AND 28),
+  notes           TEXT,
+  is_active       BOOLEAN NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_members_phone_hash ON members(phone_hash);
+CREATE INDEX IF NOT EXISTS idx_members_is_active ON members(is_active) WHERE is_active = true;
+
+-- Migration 006: Create monthly_records table
+CREATE TABLE IF NOT EXISTS monthly_records (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id        UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  month            INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year             INTEGER NOT NULL CHECK (year >= 2024),
+  amount_due       NUMERIC(15, 2) NOT NULL CHECK (amount_due > 0),
+  amount_paid      NUMERIC(15, 2) CHECK (amount_paid >= 0),
+  transaction_id   UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  status           TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'paid_on_time', 'paid_late', 'overdue')),
+  paid_at          TIMESTAMPTZ,
+  reminder_sent_at TIMESTAMPTZ,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(member_id, month, year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_monthly_records_member ON monthly_records(member_id);
+CREATE INDEX IF NOT EXISTS idx_monthly_records_period ON monthly_records(year, month);
+CREATE INDEX IF NOT EXISTS idx_monthly_records_status ON monthly_records(status);
+
+-- Migration 007: Add status tracking to users (SINPE senders)
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (status IN ('unknown', 'dismissed', 'linked')),
+  ADD COLUMN IF NOT EXISTS member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS last_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_users_status    ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_member_id ON users(member_id) WHERE member_id IS NOT NULL;
+
 -- Record all migrations as applied
 INSERT INTO migration_history (filename) VALUES
   ('001_create_users.sql'),
   ('002_create_transactions.sql'),
   ('003_create_notification_logs.sql'),
-  ('004_create_migration_history.sql')
+  ('004_create_migration_history.sql'),
+  ('005_create_members.sql'),
+  ('006_create_monthly_records.sql'),
+  ('007_users_status.sql')
 ON CONFLICT (filename) DO NOTHING;

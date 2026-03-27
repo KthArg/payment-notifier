@@ -10,6 +10,8 @@ import {
   TemplateName,
   SinpeRecibidoTemplateData,
   SinpeErrorTemplateData,
+  SinpeSinTelefonoTemplateData,
+  PaymentReminderTemplateData,
   WhatsAppTemplate,
   TemplateParameter,
 } from '../types/whatsapp.types';
@@ -137,7 +139,7 @@ export class WhatsAppService {
    */
   private buildTemplate(
     templateName: TemplateName,
-    data: SinpeRecibidoTemplateData | SinpeErrorTemplateData
+    data: SinpeRecibidoTemplateData | SinpeErrorTemplateData | SinpeSinTelefonoTemplateData | PaymentReminderTemplateData
   ): WhatsAppTemplate {
     let parameters: TemplateParameter[];
 
@@ -147,6 +149,12 @@ export class WhatsAppService {
         break;
       case 'sinpe_error':
         parameters = this.buildSinpeErrorParameters(data as SinpeErrorTemplateData);
+        break;
+      case 'sinpe_sin_telefono':
+        parameters = this.buildSinpeSinTelefonoParameters(data as SinpeSinTelefonoTemplateData);
+        break;
+      case 'payment_reminder':
+        parameters = this.buildPaymentReminderParameters(data as unknown as PaymentReminderTemplateData);
         break;
       default:
         throw new Error(`Unknown template: ${templateName}`);
@@ -189,6 +197,38 @@ export class WhatsAppService {
     return [
       { type: 'text', text: data.emailFrom },  // {{1}}
       { type: 'text', text: data.date },       // {{2}}
+    ];
+  }
+
+  /**
+   * Build parameters for sinpe_sin_telefono template
+   * Notifies account owner that a SINPE arrived but sender phone was missing.
+   * Template body (create in Meta):
+   *   "Recibiste un SINPE de *{{1}}* por *{{2}}* ({{3}}).
+   *    No se encontró el teléfono del remitente.
+   *    Regístralo aquí para notificarlo: {{4}}"
+   */
+  private buildSinpeSinTelefonoParameters(data: SinpeSinTelefonoTemplateData): TemplateParameter[] {
+    return [
+      { type: 'text', text: data.senderName }, // {{1}}
+      { type: 'text', text: data.amount },     // {{2}}
+      { type: 'text', text: data.bankName },   // {{3}}
+    ];
+  }
+
+  /**
+   * Build parameters for payment_reminder template
+   * Reminds a member that their monthly payment is due.
+   * Template body (create in Meta):
+   *   "Hola {{1}}, te recordamos que tu mensualidad de {{2}} en {{3}} vence el {{4}}.
+   *    Por favor realiza tu pago via SINPE Móvil. 🙏"
+   */
+  private buildPaymentReminderParameters(data: PaymentReminderTemplateData): TemplateParameter[] {
+    return [
+      { type: 'text', text: data.memberName },   // {{1}}
+      { type: 'text', text: data.amount },        // {{2}}
+      { type: 'text', text: data.businessName },  // {{3}}
+      { type: 'text', text: data.dueDate },       // {{4}}
     ];
   }
 

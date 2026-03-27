@@ -12,6 +12,10 @@ import usersRouter from './api/routes/users.routes';
 import transactionsRouter from './api/routes/transactions.routes';
 import notificationsRouter from './api/routes/notifications.routes';
 import queueRouter from './api/routes/queue.routes';
+import membersRouter from './api/routes/members.routes';
+import reportsRouter from './api/routes/reports.routes';
+import dashboardRouter from './api/routes/dashboard.routes';
+import sinpeSendersRouter from './api/routes/sinpe-senders.routes';
 import { apiLimiter } from './api/middleware/rate-limit.middleware';
 import { transactionQueue } from './queues/transaction.queue';
 
@@ -85,6 +89,12 @@ export function createApp(): Application {
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/queue', queueRouter);
   app.use('/api/webhooks', webhooksRouter);
+  app.use('/api/members', membersRouter);
+  app.use('/api/reports', reportsRouter);
+  app.use('/api/sinpe-senders', sinpeSendersRouter);
+
+  // Dashboard (public — secured by hard-to-guess transaction UUID in URL)
+  app.use('/dashboard', dashboardRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

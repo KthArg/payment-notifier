@@ -1,3 +1,5 @@
+export type SenderStatus = 'unknown' | 'dismissed' | 'linked';
+
 export interface User {
   id: string;
   phoneNumber: string;
@@ -6,8 +8,24 @@ export interface User {
   bankAccounts?: BankAccount[];
   isActive: boolean;
   notificationPreferences: NotificationPreferences;
+  status: SenderStatus;
+  memberId?: string;
+  dismissedAt?: Date;
+  lastTransactionId?: string;
+  lastSeenAt: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SinpeSenderWithTransaction extends User {
+  lastTransaction?: {
+    id: string;
+    amount: number;
+    currency: string;
+    bankName: string;
+    transactionDate: Date;
+    senderName?: string;
+  };
 }
 
 export interface BankAccount {

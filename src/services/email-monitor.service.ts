@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
  * Service to monitor Gmail inbox for SINPE emails
  */
 export class EmailMonitorService {
-  private readonly SINPE_QUERY = 'subject:(SINPE OR "SINPE Móvil" OR transferencia OR "pago recibido") is:unread';
+  private readonly SINPE_QUERY = 'subject:(SINPE OR SINPEMOVIL OR "SINPE Móvil" OR transferencia OR "pago recibido") is:unread';
   private readonly MAX_RESULTS = 10;
 
   /**

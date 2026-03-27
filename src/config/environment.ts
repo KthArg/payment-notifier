@@ -43,6 +43,13 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
 
+  // Account owner (fallback notifications when sender phone is missing)
+  ACCOUNT_PHONE: z.string().optional(),
+  APP_URL: z.string().url().optional(),
+
+  // Business identity (used in WhatsApp notifications)
+  BUSINESS_NAME: z.string().default('el negocio'),
+
   // CORS
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
 
