@@ -8,7 +8,8 @@ export interface ParsedTransaction {
   receiverPhone?: string;
   referenceNumber?: string;
   transactionDate: Date;
-  bankName: 'BAC' | 'BCR' | 'BN' | 'Scotiabank' | 'Davivienda';
+  // ⚠️ 'TestBank' is for local testing only — remove before production
+  bankName: 'BAC' | 'BCR' | 'BN' | 'Scotiabank' | 'Davivienda' | 'TestBank';
   emailMessageId?: string;
   rawEmailContent?: string;
 }
