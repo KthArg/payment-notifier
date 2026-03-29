@@ -132,6 +132,11 @@ ALTER TABLE users
 CREATE INDEX IF NOT EXISTS idx_users_status    ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_member_id ON users(member_id) WHERE member_id IS NOT NULL;
 
+-- Migration 008: Allow TestBank in constraint (TEST ONLY — revert with 009 before production)
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_bank_name_check;
+ALTER TABLE transactions ADD CONSTRAINT transactions_bank_name_check
+  CHECK (bank_name IN ('BAC', 'BCR', 'BN', 'Scotiabank', 'Davivienda', 'TestBank'));
+
 -- Record all migrations as applied
 INSERT INTO migration_history (filename) VALUES
   ('001_create_users.sql'),
@@ -140,5 +145,6 @@ INSERT INTO migration_history (filename) VALUES
   ('004_create_migration_history.sql'),
   ('005_create_members.sql'),
   ('006_create_monthly_records.sql'),
-  ('007_users_status.sql')
+  ('007_users_status.sql'),
+  ('008_testbank_constraint.sql')
 ON CONFLICT (filename) DO NOTHING;
