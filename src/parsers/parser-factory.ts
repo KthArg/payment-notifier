@@ -5,6 +5,8 @@ import { BNParser } from './bn.parser';
 import { ScotiabankParser } from './scotiabank.parser';
 import { ParsedTransaction } from '../types/transaction.types';
 import { logger } from '../utils/logger';
+// ⚠️  TEST ONLY — remove this import before deploying to production
+import { TestBankParser } from './test.parser';
 
 /**
  * Factory class to automatically select the correct parser for an email
@@ -19,6 +21,8 @@ export class ParserFactory {
       new BCRParser(),
       new BNParser(),
       new ScotiabankParser(),
+      // ⚠️  TEST ONLY — remove before production
+      new TestBankParser(),
     ];
 
     logger.info('Parser Factory initialized', {
