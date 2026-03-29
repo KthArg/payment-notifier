@@ -6,6 +6,7 @@ import { UserRepository } from '../../database/repositories/user.repository';
 import { NotificationLogRepository } from '../../database/repositories/notification-log.repository';
 import { MemberRepository } from '../../database/repositories/member.repository';
 import { MonthlyRecordRepository } from '../../database/repositories/monthly-record.repository';
+import { SinpeNameMappingRepository } from '../../database/repositories/sinpe-name-mapping.repository';
 import { WhatsAppService } from '../../services/whatsapp.service';
 import { QUEUE_NAME, TransactionJobData, TransactionJobResult, TransactionJobName } from '../transaction.queue';
 import { maskPhoneNumber } from '../../utils/phone-formatter';
@@ -23,6 +24,7 @@ const userRepo = new UserRepository();
 const notificationLogRepo = new NotificationLogRepository();
 const memberRepo = new MemberRepository();
 const monthlyRecordRepo = new MonthlyRecordRepository();
+const sinpeNameMappingRepo = new SinpeNameMappingRepository();
 const whatsappService = new WhatsAppService();
 
 /** BullMQ connection options derived from REDIS_URL */
@@ -89,24 +91,40 @@ async function processTransaction(
 
   logger.debug('Transaction persisted', { dbId: dbTransaction.id, transactionId });
 
-  // ── Step 2.5: Auto-register sender + match to member ─────────────────────
+  // ── Step 2.5: Register sender phone (for WhatsApp routing) ──────────────
   if (parsedTransaction.senderPhone) {
     const sender = await userRepo.upsertFromSinpe(
       parsedTransaction.senderPhone,
       parsedTransaction.senderName
     ).catch(() => null);
-
     if (sender) {
-      // Update last seen regardless of status
-      await userRepo.updateLastSeen(sender.id, dbTransaction.id);
+      await userRepo.updateLastSeen(sender.id, dbTransaction.id).catch(() => {});
+    }
+  }
 
-      // Check if sender is a registered member
-      const member = await memberRepo.findByPhone(parsedTransaction.senderPhone).catch(() => null);
+  // ── Step 2.6: Name-based member matching ─────────────────────────────────
+  // All first-time names are registered as pending (unlinked).
+  // Only names that have been manually linked by the admin auto-process.
+  if (parsedTransaction.senderName) {
+    const mapping = await sinpeNameMappingRepo.findByName(parsedTransaction.senderName).catch(() => null);
+
+    if (!mapping) {
+      // First time seeing this name — register and wait for admin to link
+      await sinpeNameMappingRepo.register(parsedTransaction.senderName).catch(() => {});
+      logger.info('New SINPE sender name registered — pending admin link', {
+        senderName: parsedTransaction.senderName,
+        transactionId,
+      });
+    } else if (mapping.isAmbiguous) {
+      // Multiple members share this name — admin must assign manually each time
+      logger.info('Ambiguous sender name — skipping auto-match', {
+        senderName: parsedTransaction.senderName,
+        transactionId,
+      });
+    } else if (mapping.memberId) {
+      // Linked: auto-match to member and record payment
+      const member = await memberRepo.findById(mapping.memberId).catch(() => null);
       if (member) {
-        // Link sender to member if not already
-        if (sender.status !== 'linked') {
-          await userRepo.linkToMember(sender.id, member.id);
-        }
         const now = new Date();
         const month = now.getMonth() + 1;
         const year = now.getFullYear();
@@ -119,20 +137,14 @@ async function processTransaction(
             status: isPaidOnTime ? 'paid_on_time' : 'paid_late',
             paidAt: now,
           }).catch(() => {});
-          logger.info('Member payment recorded', {
+          logger.info('Member payment auto-recorded via name mapping', {
             memberId: member.id,
             memberName: member.fullName,
+            senderName: parsedTransaction.senderName,
             month, year,
             status: isPaidOnTime ? 'paid_on_time' : 'paid_late',
           });
         }
-      } else if (sender.status === 'unknown') {
-        // Unknown sender — not a member, not dismissed — flag for admin review
-        logger.info('Unknown sender flagged for admin review', {
-          senderId: sender.id,
-          phone: maskPhoneNumber(parsedTransaction.senderPhone),
-          transactionId,
-        });
       }
     }
   }

@@ -248,6 +248,25 @@ export class TransactionRepository {
   }
 
   /**
+   * Find transactions by decrypted sender name (normalized lowercase match).
+   * Used for retroactive payment matching when admin links a name to a member.
+   * Note: decrypts all rows with a sender_name — acceptable for small datasets.
+   */
+  async findBySenderName(normalizedName: string): Promise<Transaction[]> {
+    try {
+      const rows = await db.any<TransactionRow>(
+        'SELECT * FROM transactions WHERE sender_name IS NOT NULL ORDER BY transaction_date ASC'
+      );
+      return rows
+        .map(rowToTransaction)
+        .filter(tx => tx.senderName?.toLowerCase().trim().replace(/\s+/g, ' ') === normalizedName);
+    } catch (error: any) {
+      logger.error('TransactionRepository.findBySenderName error', { error: error.message });
+      return [];
+    }
+  }
+
+  /**
    * Count transactions in a date range (for stats).
    */
   async countByDateRange(from: Date, to: Date): Promise<number> {

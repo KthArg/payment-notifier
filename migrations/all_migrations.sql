@@ -132,6 +132,19 @@ ALTER TABLE users
 CREATE INDEX IF NOT EXISTS idx_users_status    ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_member_id ON users(member_id) WHERE member_id IS NOT NULL;
 
+-- Migration 008: SINPE name-to-member mappings
+CREATE TABLE IF NOT EXISTS sinpe_name_mappings (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_name      TEXT NOT NULL UNIQUE,
+  sender_name_display TEXT NOT NULL,
+  member_id        UUID REFERENCES members(id) ON DELETE SET NULL,
+  is_ambiguous     BOOLEAN NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sinpe_name_mappings_member ON sinpe_name_mappings(member_id) WHERE member_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sinpe_name_mappings_ambiguous ON sinpe_name_mappings(is_ambiguous);
+
 -- Record all migrations as applied
 INSERT INTO migration_history (filename) VALUES
   ('001_create_users.sql'),
@@ -140,5 +153,6 @@ INSERT INTO migration_history (filename) VALUES
   ('004_create_migration_history.sql'),
   ('005_create_members.sql'),
   ('006_create_monthly_records.sql'),
-  ('007_users_status.sql')
+  ('007_users_status.sql'),
+  ('008_sinpe_name_mappings.sql')
 ON CONFLICT (filename) DO NOTHING;

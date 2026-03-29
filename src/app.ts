@@ -16,6 +16,7 @@ import membersRouter from './api/routes/members.routes';
 import reportsRouter from './api/routes/reports.routes';
 import dashboardRouter from './api/routes/dashboard.routes';
 import sinpeSendersRouter from './api/routes/sinpe-senders.routes';
+import sinpeMappingsRouter from './api/routes/sinpe-mappings.routes';
 import { apiLimiter } from './api/middleware/rate-limit.middleware';
 import { transactionQueue } from './queues/transaction.queue';
 
@@ -92,6 +93,7 @@ export function createApp(): Application {
   app.use('/api/members', membersRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/sinpe-senders', sinpeSendersRouter);
+  app.use('/api/sinpe-mappings', sinpeMappingsRouter);
 
   // Dashboard (public — secured by hard-to-guess transaction UUID in URL)
   app.use('/dashboard', dashboardRouter);
