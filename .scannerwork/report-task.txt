@@ -1,0 +1,6 @@
+projectKey=payment-notifier-backend
+serverUrl=http://localhost:9000
+serverVersion=25.1.0.102122
+dashboardUrl=http://localhost:9000/dashboard?id=payment-notifier-backend
+ceTaskId=b71a5519-1646-4b67-be2b-2b0074e9e00a
+ceTaskUrl=http://localhost:9000/api/ce/task?id=b71a5519-1646-4b67-be2b-2b0074e9e00a

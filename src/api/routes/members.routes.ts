@@ -59,6 +59,36 @@ router.put('/:id', async (req: Request<{ id: string }>, res: Response) => {
   res.json({ data: updated });
 });
 
+// POST /api/members/:id/records/:recordId/pay — manual cash payment
+router.post('/:id/records/:recordId/pay', async (
+  req: Request<{ id: string; recordId: string }>, res: Response
+) => {
+  const member = await memberRepo.findById(req.params.id);
+  if (!member) { res.status(404).json({ error: 'Miembro no encontrado' }); return; }
+
+  const record = await monthlyRepo.findById(req.params.recordId);
+  if (!record || record.memberId !== req.params.id) {
+    res.status(404).json({ error: 'Registro no encontrado' }); return;
+  }
+  if (record.status === 'paid_on_time' || record.status === 'paid_late') {
+    res.status(409).json({ error: 'Este mes ya está marcado como pagado' }); return;
+  }
+
+  const amountPaid = Number(req.body.amountPaid) || record.amountDue;
+  const notes = req.body.notes ? `[Efectivo] ${req.body.notes}` : '[Efectivo]';
+  const now = new Date();
+  const isPaidOnTime = now.getDate() <= member.dueDay;
+
+  const updated = await monthlyRepo.markPaid(record.id, {
+    amountPaid,
+    status: isPaidOnTime ? 'paid_on_time' : 'paid_late',
+    paidAt: now,
+    notes,
+  });
+  if (!updated) { res.status(500).json({ error: 'Error al actualizar el registro' }); return; }
+  res.json({ data: updated });
+});
+
 // DELETE /api/members/:id (soft delete)
 router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
   const ok = await memberRepo.deactivate(req.params.id);

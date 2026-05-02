@@ -86,19 +86,31 @@ export class MonthlyRecordRepository {
   /** Mark a record as paid */
   async markPaid(
     id: string,
-    opts: { amountPaid: number; transactionId?: string; status: 'paid_on_time' | 'paid_late'; paidAt: Date }
+    opts: { amountPaid: number; transactionId?: string; status: 'paid_on_time' | 'paid_late'; paidAt: Date; notes?: string }
   ): Promise<MonthlyRecord | null> {
     try {
       const row = await db.oneOrNone<MonthlyRecordRow>(
         `UPDATE monthly_records
-         SET amount_paid = $1, transaction_id = $2, status = $3, paid_at = $4, updated_at = NOW()
+         SET amount_paid = $1, transaction_id = $2, status = $3, paid_at = $4,
+             notes = COALESCE($6, notes), updated_at = NOW()
          WHERE id = $5
          RETURNING *`,
-        [opts.amountPaid, opts.transactionId ?? null, opts.status, opts.paidAt, id]
+        [opts.amountPaid, opts.transactionId ?? null, opts.status, opts.paidAt, id, opts.notes ?? null]
       );
       return row ? rowToRecord(row) : null;
     } catch (error: any) {
       logger.error('MonthlyRecordRepository.markPaid error', { id, error: error.message });
+      return null;
+    }
+  }
+
+  /** Find a record by ID */
+  async findById(id: string): Promise<MonthlyRecord | null> {
+    try {
+      const row = await db.oneOrNone<MonthlyRecordRow>('SELECT * FROM monthly_records WHERE id = $1', [id]);
+      return row ? rowToRecord(row) : null;
+    } catch (error: any) {
+      logger.error('MonthlyRecordRepository.findById error', { id, error: error.message });
       return null;
     }
   }
