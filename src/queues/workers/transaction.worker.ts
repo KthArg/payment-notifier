@@ -91,17 +91,6 @@ async function processTransaction(
 
   logger.debug('Transaction persisted', { dbId: dbTransaction.id, transactionId });
 
-  // ── Step 2.5: Register sender phone (for WhatsApp routing) ──────────────
-  if (parsedTransaction.senderPhone) {
-    const sender = await userRepo.upsertFromSinpe(
-      parsedTransaction.senderPhone,
-      parsedTransaction.senderName
-    ).catch(() => null);
-    if (sender) {
-      await userRepo.updateLastSeen(sender.id, dbTransaction.id).catch(() => {});
-    }
-  }
-
   // ── Step 2.6: Name-based member matching ─────────────────────────────────
   // All first-time names are registered as pending (unlinked).
   // Only names that have been manually linked by the admin auto-process.
